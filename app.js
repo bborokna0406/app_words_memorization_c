@@ -1,4 +1,6 @@
+// 이 키는 앱 업데이트 후에도 기존 단어를 유지하기 위해 변경하지 않습니다.
 const STORAGE_KEY = "chinese-words-memorization-v1";
+const APP_VERSION = "2026.06.23.2";
 
 const state = {
   words: [],
@@ -41,7 +43,10 @@ const elements = {
   importButton: document.querySelector("#importButton"),
   fileInput: document.querySelector("#fileInput"),
   toast: document.querySelector("#toast"),
+  versionText: document.querySelector("#versionText"),
 };
+
+elements.versionText.textContent = APP_VERSION;
 
 function createId() {
   if (window.crypto && typeof window.crypto.randomUUID === "function") {
@@ -359,9 +364,53 @@ function handleListClick(event) {
 }
 
 function registerServiceWorker() {
-  if ("serviceWorker" in navigator && location.protocol !== "file:") {
-    navigator.serviceWorker.register("sw.js").catch(() => {});
+  if (!("serviceWorker" in navigator) || location.protocol === "file:") {
+    return;
   }
+
+  const alreadyInstalled = Boolean(navigator.serviceWorker.controller);
+  let reloading = false;
+
+  const reloadWithNewVersion = () => {
+    if (reloading) return;
+    reloading = true;
+    showToast("새 버전을 적용합니다.");
+    setTimeout(() => location.reload(), 350);
+  };
+
+  const checkVersion = async () => {
+    try {
+      const response = await fetch(`./version.json?t=${Date.now()}`, { cache: "no-store" });
+      if (!response.ok) return;
+      const remote = await response.json();
+      if (remote.version && remote.version !== APP_VERSION) {
+        reloadWithNewVersion();
+      }
+    } catch {
+      // 오프라인에서는 현재 캐시 버전을 계속 사용합니다.
+    }
+  };
+
+  if (alreadyInstalled) {
+    navigator.serviceWorker.addEventListener("controllerchange", reloadWithNewVersion);
+  }
+
+  navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" })
+    .then((registration) => {
+      const checkForUpdate = () => {
+        registration.update().catch(() => {});
+        checkVersion();
+      };
+
+      checkForUpdate();
+      window.addEventListener("focus", checkForUpdate);
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+          checkForUpdate();
+        }
+      });
+    })
+    .catch(() => {});
 }
 
 elements.wordForm.addEventListener("submit", upsertWord);

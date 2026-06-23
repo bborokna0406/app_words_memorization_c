@@ -342,6 +342,13 @@ textarea:focus {
   text-align: center;
 }
 
+.app-footer {
+  padding: 18px 4px 4px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
 .toast {
   position: fixed;
   left: 16px;
