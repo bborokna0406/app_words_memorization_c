@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f7f5ee">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="중국어암기">
+  <meta name="apple-mobile-web-app-title" content="일본어암기">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <title>중국어 단어 암기</title>
+  <title>일본어 단어 암기</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
   <link rel="stylesheet" href="styles.css">
@@ -18,8 +18,9 @@
       <div class="brand-block">
         <img src="assets/app-mark.svg" alt="" class="brand-mark">
         <div>
-          <h1>중국어 단어 암기</h1>
+          <h1>일본어 단어 암기</h1>
           <p id="summaryText">저장된 단어 0개</p>
+          <p id="appVersion" class="app-version">버전 확인 중</p>
         </div>
       </div>
       <button class="icon-button" id="exportButton" type="button" title="백업 내보내기" aria-label="백업 내보내기">
@@ -30,7 +31,7 @@
     <main>
       <section class="entry-panel" aria-labelledby="entryTitle">
         <div class="section-title-row">
-          <h2 id="entryTitle">새 중국어 단어</h2>
+          <h2 id="entryTitle">새 일본어 단어</h2>
           <span id="editBadge" class="edit-badge" hidden>수정 중</span>
         </div>
         <form id="wordForm" class="word-form">
@@ -39,12 +40,12 @@
             <input id="wordInput" type="text" autocomplete="off" maxlength="100" required>
           </label>
           <label>
-            <span>뜻</span>
-            <textarea id="meaningInput" rows="3" maxlength="200" required></textarea>
+            <span>발음</span>
+            <input id="pronunciationInput" type="text" autocomplete="off" maxlength="100" placeholder="히라가나" required>
           </label>
           <label>
-            <span>발음</span>
-            <input id="pronunciationInput" type="text" autocomplete="off" maxlength="100" placeholder="한어병음" required>
+            <span>뜻</span>
+            <textarea id="meaningInput" rows="3" maxlength="200" required></textarea>
           </label>
           <div class="form-actions">
             <button class="primary-button" type="submit" id="saveButton">
@@ -63,7 +64,7 @@
         </div>
         <div class="quiz-box" id="quizBox">
           <p class="quiz-label" id="quizLabel">문제</p>
-          <p class="quiz-text" id="quizText">중국어 단어를 추가하면 바로 학습할 수 있습니다.</p>
+          <p class="quiz-text" id="quizText">일본어 단어를 추가하면 바로 학습할 수 있습니다.</p>
           <div class="answer-block" id="answerBlock" hidden></div>
         </div>
         <div class="study-actions">
@@ -84,12 +85,9 @@
           <input id="searchInput" type="search" placeholder="단어, 뜻, 발음 검색" autocomplete="off">
         </div>
         <ul id="wordList" class="word-list"></ul>
-        <p id="emptyText" class="empty-text">아직 저장된 중국어 단어가 없습니다.</p>
+        <p id="emptyText" class="empty-text">아직 저장된 일본어 단어가 없습니다.</p>
       </section>
     </main>
-    <footer class="app-footer" aria-label="앱 버전">
-      버전 <span id="versionText"></span>
-    </footer>
   </div>
 
   <input id="fileInput" type="file" accept="application/json,.json" hidden>

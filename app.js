@@ -1,6 +1,6 @@
 // 이 키는 앱 업데이트 후에도 기존 단어를 유지하기 위해 변경하지 않습니다.
-const STORAGE_KEY = "chinese-words-memorization-v1";
-const APP_VERSION = "2026.06.23.2";
+const STORAGE_KEY = "japanese-words-memorization-v1";
+const APP_VERSION = "2026.06.23.3";
 
 const state = {
   words: [],
@@ -17,12 +17,13 @@ const icons = {
 
 const fields = [
   { key: "word", label: "단어" },
-  { key: "meaning", label: "뜻" },
   { key: "pronunciation", label: "발음" },
+  { key: "meaning", label: "뜻" },
 ];
 
 const elements = {
   summaryText: document.querySelector("#summaryText"),
+  appVersion: document.querySelector("#appVersion"),
   wordForm: document.querySelector("#wordForm"),
   wordInput: document.querySelector("#wordInput"),
   meaningInput: document.querySelector("#meaningInput"),
@@ -43,10 +44,7 @@ const elements = {
   importButton: document.querySelector("#importButton"),
   fileInput: document.querySelector("#fileInput"),
   toast: document.querySelector("#toast"),
-  versionText: document.querySelector("#versionText"),
 };
-
-elements.versionText.textContent = APP_VERSION;
 
 function createId() {
   if (window.crypto && typeof window.crypto.randomUUID === "function") {
@@ -78,8 +76,8 @@ function normalizeWordItem(item) {
   return {
     id: item.id || createId(),
     word: normalizeText(item.word),
-    meaning: normalizeText(item.meaning),
     pronunciation: normalizeText(item.pronunciation),
+    meaning: normalizeText(item.meaning),
     createdAt: Number(item.createdAt) || Date.now(),
   };
 }
@@ -108,7 +106,8 @@ function escapeHtml(value) {
 }
 
 function renderSummary() {
-  elements.summaryText.textContent = `저장된 중국어 단어 ${state.words.length}개`;
+  elements.summaryText.textContent = `저장된 일본어 단어 ${state.words.length}개`;
+  elements.appVersion.textContent = `버전 ${APP_VERSION}`;
 }
 
 function renderList() {
@@ -121,8 +120,8 @@ function renderList() {
     <li class="word-item" data-id="${escapeHtml(item.id)}">
       <div class="word-main">
         <strong>${escapeHtml(item.word)}</strong>
-        <span>${escapeHtml(item.meaning)}</span>
         <span class="word-pronunciation">${escapeHtml(item.pronunciation)}</span>
+        <span>${escapeHtml(item.meaning)}</span>
       </div>
       <div class="item-actions">
         <button type="button" data-action="edit" title="수정" aria-label="${escapeHtml(item.word)} 수정">
@@ -137,7 +136,7 @@ function renderList() {
 
   elements.emptyText.hidden = filteredWords.length > 0;
   elements.emptyText.textContent = state.words.length === 0
-    ? "아직 저장된 중국어 단어가 없습니다."
+    ? "아직 저장된 일본어 단어가 없습니다."
     : "검색 결과가 없습니다.";
 }
 
@@ -148,7 +147,7 @@ function renderStudyControls() {
 
   if (!hasWords) {
     elements.quizLabel.textContent = "문제";
-    elements.quizText.textContent = "중국어 단어를 추가하면 바로 학습할 수 있습니다.";
+    elements.quizText.textContent = "일본어 단어를 추가하면 바로 학습할 수 있습니다.";
     elements.answerBlock.hidden = true;
     elements.answerBlock.innerHTML = "";
     elements.studyModeText.textContent = "준비됨";
@@ -211,8 +210,8 @@ function upsertWord(event) {
       showToast("단어를 수정했습니다.");
     }
   } else {
-    state.words.unshift({ id: createId(), word, meaning, pronunciation, createdAt: Date.now() });
-    showToast("중국어 단어를 저장했습니다.");
+    state.words.unshift({ id: createId(), word, pronunciation, meaning, createdAt: Date.now() });
+    showToast("일본어 단어를 저장했습니다.");
   }
 
   saveWords();
@@ -299,7 +298,7 @@ function showAnswer() {
 
 function exportWords() {
   const data = {
-    app: "chinese-words-memorization",
+    app: "japanese-words-memorization",
     exportedAt: new Date().toISOString(),
     words: state.words,
   };
@@ -308,7 +307,7 @@ function exportWords() {
   const link = document.createElement("a");
 
   link.href = url;
-  link.download = "chinese-words-backup.json";
+  link.download = "japanese-words-backup.json";
   document.body.append(link);
   link.click();
   link.remove();
