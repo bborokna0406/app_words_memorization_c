@@ -20,6 +20,7 @@
         <div>
           <h1>중국어 단어 암기</h1>
           <p id="summaryText">저장된 단어 0개</p>
+          <p class="app-version">버전 <span id="versionText"></span></p>
         </div>
       </div>
       <button class="icon-button" id="exportButton" type="button" title="백업 내보내기" aria-label="백업 내보내기">
@@ -81,15 +82,12 @@
           <button class="text-button" type="button" id="importButton">가져오기</button>
         </div>
         <div class="search-row">
-          <input id="searchInput" type="search" placeholder="단어, 뜻, 발음 검색" autocomplete="off">
+          <input id="searchInput" type="search" placeholder="단어, 발음, 뜻 검색" autocomplete="off">
         </div>
         <ul id="wordList" class="word-list"></ul>
         <p id="emptyText" class="empty-text">아직 저장된 중국어 단어가 없습니다.</p>
       </section>
     </main>
-    <footer class="app-footer" aria-label="앱 버전">
-      버전 <span id="versionText"></span>
-    </footer>
   </div>
 
   <input id="fileInput" type="file" accept="application/json,.json" hidden>

@@ -1,6 +1,6 @@
 // 이 키는 앱 업데이트 후에도 기존 단어를 유지하기 위해 변경하지 않습니다.
 const STORAGE_KEY = "chinese-words-memorization-v1";
-const APP_VERSION = "2026.06.23.3";
+const APP_VERSION = "2026.06.23.4";
 
 const state = {
   words: [],
