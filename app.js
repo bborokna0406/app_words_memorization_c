@@ -1,11 +1,15 @@
 // 이 키는 앱 업데이트 후에도 기존 단어를 유지하기 위해 변경하지 않습니다.
 const STORAGE_KEY = "chinese-words-memorization-v1";
-const APP_VERSION = "2026.06.23.4";
+const APP_VERSION = "2026.06.24.1";
 
 const state = {
   words: [],
   editingId: null,
   currentQuestion: null,
+  studyQueue: [],
+  completedRounds: 0,
+  studyStarted: false,
+  cycleComplete: false,
 };
 
 const icons = {
@@ -21,6 +25,11 @@ const fields = [
   { key: "meaning", label: "뜻" },
 ];
 
+const pronunciationCollator = new Intl.Collator("en", {
+  sensitivity: "base",
+  numeric: true,
+});
+
 const elements = {
   summaryText: document.querySelector("#summaryText"),
   wordForm: document.querySelector("#wordForm"),
@@ -33,6 +42,7 @@ const elements = {
   wordList: document.querySelector("#wordList"),
   emptyText: document.querySelector("#emptyText"),
   searchInput: document.querySelector("#searchInput"),
+  sortSelect: document.querySelector("#sortSelect"),
   studyButton: document.querySelector("#studyButton"),
   answerButton: document.querySelector("#answerButton"),
   quizLabel: document.querySelector("#quizLabel"),
@@ -116,8 +126,16 @@ function renderList() {
   const filteredWords = state.words.filter((item) => {
     return fields.some(({ key }) => item[key].toLowerCase().includes(query));
   });
+  const visibleWords = [...filteredWords];
 
-  elements.wordList.innerHTML = filteredWords.map((item) => `
+  if (elements.sortSelect.value === "pronunciation") {
+    visibleWords.sort((a, b) => {
+      return pronunciationCollator.compare(a.pronunciation, b.pronunciation)
+        || pronunciationCollator.compare(a.word, b.word);
+    });
+  }
+
+  elements.wordList.innerHTML = visibleWords.map((item) => `
     <li class="word-item" data-id="${escapeHtml(item.id)}">
       <div class="word-main">
         <strong>${escapeHtml(item.word)}</strong>
@@ -135,7 +153,7 @@ function renderList() {
     </li>
   `).join("");
 
-  elements.emptyText.hidden = filteredWords.length > 0;
+  elements.emptyText.hidden = visibleWords.length > 0;
   elements.emptyText.textContent = state.words.length === 0
     ? "아직 저장된 중국어 단어가 없습니다."
     : "검색 결과가 없습니다.";
@@ -156,14 +174,27 @@ function renderStudyControls() {
     return;
   }
 
+  if (state.cycleComplete) {
+    renderCycleCompletion();
+    return;
+  }
+
   if (!state.currentQuestion) {
     elements.quizLabel.textContent = "문제";
-    elements.quizText.textContent = "시작을 누르면 단어, 발음, 뜻 중 하나가 무작위로 나옵니다.";
+    elements.quizText.textContent = "시작을 누르면 모든 단어가 한 번씩 무작위 순서로 나옵니다.";
     elements.answerBlock.hidden = true;
     elements.answerBlock.innerHTML = "";
     elements.studyModeText.textContent = "대기 중";
     elements.studyButton.innerHTML = `${icons.play}시작`;
   }
+}
+
+function resetStudySession() {
+  state.currentQuestion = null;
+  state.studyQueue = [];
+  state.completedRounds = 0;
+  state.studyStarted = false;
+  state.cycleComplete = false;
 }
 
 function render() {
@@ -215,6 +246,7 @@ function upsertWord(event) {
     showToast("중국어 단어를 저장했습니다.");
   }
 
+  resetStudySession();
   saveWords();
   clearForm();
   render();
@@ -248,9 +280,7 @@ function deleteWord(id) {
   }
 
   state.words = state.words.filter((item) => item.id !== id);
-  if (state.currentQuestion && state.currentQuestion.id === id) {
-    state.currentQuestion = null;
-  }
+  resetStudySession();
 
   saveWords();
   clearForm();
@@ -258,12 +288,47 @@ function deleteWord(id) {
   showToast("단어를 삭제했습니다.");
 }
 
-function pickQuestion() {
-  if (state.words.length === 0) {
+function shuffle(items) {
+  const shuffled = [...items];
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
+  }
+
+  return shuffled;
+}
+
+function renderCycleCompletion() {
+  elements.quizLabel.textContent = `${state.completedRounds}회독 완료`;
+  elements.quizText.textContent = "목록의 모든 단어를 한 번씩 확인했습니다. 다음 회독을 계속할까요?";
+  elements.answerBlock.hidden = true;
+  elements.answerBlock.innerHTML = "";
+  elements.studyModeText.textContent = `${state.completedRounds}회독 완료`;
+  elements.studyButton.innerHTML = `${icons.next}다음 회독`;
+  elements.answerButton.disabled = true;
+}
+
+function completeStudyCycle() {
+  state.currentQuestion = null;
+  state.completedRounds += 1;
+  state.cycleComplete = true;
+  renderCycleCompletion();
+}
+
+function showNextQuestion() {
+  let item = null;
+
+  while (state.studyQueue.length > 0 && !item) {
+    const nextId = state.studyQueue.shift();
+    item = state.words.find((word) => word.id === nextId) || null;
+  }
+
+  if (!item) {
+    completeStudyCycle();
     return;
   }
 
-  const item = state.words[Math.floor(Math.random() * state.words.length)];
   const questionField = fields[Math.floor(Math.random() * fields.length)];
   const answerFields = fields.filter((field) => field.key !== questionField.key);
 
@@ -281,9 +346,37 @@ function pickQuestion() {
   elements.quizText.textContent = state.currentQuestion.prompt;
   elements.answerBlock.hidden = true;
   elements.answerBlock.innerHTML = "";
-  elements.studyModeText.textContent = "학습 중";
+  const currentRound = state.completedRounds + 1;
+  const checkedCount = state.words.length - state.studyQueue.length;
+  elements.studyModeText.textContent = `${currentRound}회독 · ${checkedCount}/${state.words.length}`;
   elements.studyButton.innerHTML = `${icons.next}다음`;
   elements.answerButton.disabled = false;
+}
+
+function startStudyCycle() {
+  state.studyQueue = shuffle(state.words.map((item) => item.id));
+  state.currentQuestion = null;
+  state.studyStarted = true;
+  state.cycleComplete = false;
+  showNextQuestion();
+}
+
+function pickQuestion() {
+  if (state.words.length === 0) {
+    return;
+  }
+
+  if (!state.studyStarted || state.cycleComplete) {
+    startStudyCycle();
+    return;
+  }
+
+  if (state.studyQueue.length === 0) {
+    completeStudyCycle();
+    return;
+  }
+
+  showNextQuestion();
 }
 
 function showAnswer() {
@@ -333,6 +426,7 @@ function importWords(file) {
       imported.forEach((item) => byWord.set(item.word, item));
       state.words = Array.from(byWord.values());
 
+      resetStudySession();
       saveWords();
       render();
       showToast(`${imported.length}개 단어를 가져왔습니다.`);
@@ -420,6 +514,7 @@ elements.cancelEditButton.addEventListener("click", () => {
 });
 elements.wordList.addEventListener("click", handleListClick);
 elements.searchInput.addEventListener("input", renderList);
+elements.sortSelect.addEventListener("change", renderList);
 elements.studyButton.addEventListener("click", pickQuestion);
 elements.answerButton.addEventListener("click", showAnswer);
 elements.exportButton.addEventListener("click", exportWords);

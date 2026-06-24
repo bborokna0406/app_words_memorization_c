@@ -34,7 +34,8 @@ body {
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
@@ -152,7 +153,8 @@ label {
 }
 
 input,
-textarea {
+textarea,
+select {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -168,7 +170,8 @@ textarea {
 }
 
 input:focus,
-textarea:focus {
+textarea:focus,
+select:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(31, 122, 107, 0.14);
 }
@@ -178,6 +181,17 @@ textarea:focus {
 .search-row {
   display: flex;
   gap: 10px;
+}
+
+.search-row input {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.sort-select {
+  min-height: 44px;
+  flex: 0 0 104px;
+  padding: 0 10px;
 }
 
 .primary-button,
