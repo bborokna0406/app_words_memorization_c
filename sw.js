@@ -1,9 +1,10 @@
 const CACHE_PREFIX = "chinese-words-memorization-";
-const CACHE_NAME = `${CACHE_PREFIX}app-shell-v4`;
+const CACHE_NAME = `${CACHE_PREFIX}app-shell-v5`;
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
+  "./word-store.js",
   "./app.js",
   "./manifest.webmanifest",
   "./version.json",

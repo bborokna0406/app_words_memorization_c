@@ -1,6 +1,9 @@
 // 이 키는 앱 업데이트 후에도 기존 단어를 유지하기 위해 변경하지 않습니다.
 const STORAGE_KEY = "chinese-words-memorization-v1";
-const APP_VERSION = "2026.06.26.2";
+const APP_VERSION = "2026.06.30.1";
+
+let wordStore = null;
+const duplicateIndexes = {};
 
 const state = {
   words: [],
@@ -37,6 +40,9 @@ const elements = {
   meaningInput: document.querySelector("#meaningInput"),
   pronunciationInput: document.querySelector("#pronunciationInput"),
   exampleInput: document.querySelector("#exampleInput"),
+  wordDuplicate: document.querySelector("#wordDuplicate"),
+  pronunciationDuplicate: document.querySelector("#pronunciationDuplicate"),
+  meaningDuplicate: document.querySelector("#meaningDuplicate"),
   saveButton: document.querySelector("#saveButton"),
   cancelEditButton: document.querySelector("#cancelEditButton"),
   editBadge: document.querySelector("#editBadge"),
@@ -67,22 +73,12 @@ function createId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function loadWords() {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    state.words = saved ? JSON.parse(saved).map(normalizeWordItem).filter(isCompleteWord) : [];
-  } catch {
-    state.words = [];
-    showToast("저장된 데이터를 읽지 못했습니다.");
-  }
-}
-
-function saveWords() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.words));
-}
-
 function normalizeText(value) {
   return String(value || "").trim();
+}
+
+function normalizeForComparison(value) {
+  return normalizeText(value).normalize("NFKC").replace(/\s+/g, " ").toLocaleLowerCase();
 }
 
 function normalizeWordItem(item) {
@@ -98,6 +94,59 @@ function normalizeWordItem(item) {
 
 function isCompleteWord(item) {
   return item.word && item.meaning && item.pronunciation;
+}
+
+function duplicateFields() {
+  return [
+    { key: "word", input: elements.wordInput, message: elements.wordDuplicate },
+    { key: "pronunciation", input: elements.pronunciationInput, message: elements.pronunciationDuplicate },
+    { key: "meaning", input: elements.meaningInput, message: elements.meaningDuplicate },
+  ];
+}
+
+function rebuildDuplicateIndexes() {
+  duplicateFields().forEach(({ key }) => {
+    const index = new Map();
+    state.words.forEach((item) => {
+      const value = normalizeForComparison(item[key]);
+      if (!value) return;
+      if (!index.has(value)) index.set(value, new Set());
+      index.get(value).add(item.id);
+    });
+    duplicateIndexes[key] = index;
+  });
+}
+
+function updateDuplicateWarnings() {
+  duplicateFields().forEach(({ key, input, message }) => {
+    const value = normalizeForComparison(input.value);
+    const ids = duplicateIndexes[key]?.get(value);
+    const isDuplicate = Boolean(value && ids && Array.from(ids).some((id) => id !== state.editingId));
+    input.classList.toggle("is-duplicate", isDuplicate);
+    message.hidden = !isDuplicate;
+    if (isDuplicate) input.setAttribute("aria-invalid", "true");
+    else input.removeAttribute("aria-invalid");
+  });
+}
+
+async function loadWords() {
+  wordStore = createWordStore({
+    storageKey: STORAGE_KEY,
+    normalizeItem: normalizeWordItem,
+    isValidItem: isCompleteWord,
+    normalizeForComparison,
+    indexFields: ["word", "pronunciation", "meaning"],
+  });
+  const result = await wordStore.initialize();
+  state.words = result.words;
+  rebuildDuplicateIndexes();
+  if (result.migrated) showToast("기존 단어를 안전하게 이전했습니다.");
+}
+
+async function saveWords() {
+  await wordStore.requestPersistence();
+  await wordStore.replaceAll(state.words);
+  rebuildDuplicateIndexes();
 }
 
 function showToast(message) {
@@ -216,9 +265,10 @@ function clearForm() {
   elements.editBadge.hidden = true;
   elements.cancelEditButton.hidden = true;
   elements.saveButton.innerHTML = `${icons.save}저장`;
+  updateDuplicateWarnings();
 }
 
-function upsertWord(event) {
+async function upsertWord(event) {
   event.preventDefault();
 
   const word = normalizeText(elements.wordInput.value);
@@ -232,14 +282,18 @@ function upsertWord(event) {
   }
 
   const duplicate = state.words.find((item) => {
-    return item.word === word && item.id !== state.editingId;
+    return normalizeForComparison(item.word) === normalizeForComparison(word)
+      && item.id !== state.editingId;
   });
+
+  const previousWords = state.words.map((item) => ({ ...item }));
+  let successMessage = "중국어 단어를 저장했습니다.";
 
   if (duplicate) {
     duplicate.meaning = meaning;
     duplicate.pronunciation = pronunciation;
     duplicate.example = example;
-    showToast("이미 있는 단어의 발음과 뜻을 수정했습니다.");
+    successMessage = "이미 있는 단어의 발음과 뜻을 수정했습니다.";
   } else if (state.editingId) {
     const target = state.words.find((item) => item.id === state.editingId);
     if (target) {
@@ -247,17 +301,24 @@ function upsertWord(event) {
       target.meaning = meaning;
       target.pronunciation = pronunciation;
       target.example = example;
-      showToast("단어를 수정했습니다.");
+      successMessage = "단어를 수정했습니다.";
     }
   } else {
     state.words.unshift({ id: createId(), word, meaning, pronunciation, example, createdAt: Date.now() });
-    showToast("중국어 단어를 저장했습니다.");
   }
 
   resetStudySession();
-  saveWords();
+  try {
+    await saveWords();
+  } catch {
+    state.words = previousWords;
+    rebuildDuplicateIndexes();
+    showToast("저장하지 못했습니다. 저장공간을 확인하세요.");
+    return;
+  }
   clearForm();
   render();
+  showToast(successMessage);
 }
 
 function editWord(id) {
@@ -274,10 +335,11 @@ function editWord(id) {
   elements.editBadge.hidden = false;
   elements.cancelEditButton.hidden = false;
   elements.saveButton.innerHTML = `${icons.edit}수정`;
+  updateDuplicateWarnings();
   elements.wordInput.focus();
 }
 
-function deleteWord(id) {
+async function deleteWord(id) {
   const target = state.words.find((item) => item.id === id);
   if (!target) {
     return;
@@ -288,10 +350,18 @@ function deleteWord(id) {
     return;
   }
 
+  const previousWords = state.words;
   state.words = state.words.filter((item) => item.id !== id);
   resetStudySession();
 
-  saveWords();
+  try {
+    await saveWords();
+  } catch {
+    state.words = previousWords;
+    rebuildDuplicateIndexes();
+    showToast("삭제 내용을 저장하지 못했습니다.");
+    return;
+  }
   clearForm();
   render();
   showToast("단어를 삭제했습니다.");
@@ -429,7 +499,7 @@ function exportWords() {
 function importWords(file) {
   const reader = new FileReader();
 
-  reader.addEventListener("load", () => {
+  reader.addEventListener("load", async () => {
     try {
       const parsed = JSON.parse(String(reader.result));
       const sourceWords = Array.isArray(parsed) ? parsed : parsed.words;
@@ -444,7 +514,7 @@ function importWords(file) {
       state.words = Array.from(byWord.values());
 
       resetStudySession();
-      saveWords();
+      await saveWords();
       render();
       showToast(`${imported.length}개 단어를 가져왔습니다.`);
     } catch {
@@ -525,6 +595,9 @@ function registerServiceWorker() {
 }
 
 elements.wordForm.addEventListener("submit", upsertWord);
+elements.wordInput.addEventListener("input", updateDuplicateWarnings);
+elements.pronunciationInput.addEventListener("input", updateDuplicateWarnings);
+elements.meaningInput.addEventListener("input", updateDuplicateWarnings);
 elements.cancelEditButton.addEventListener("click", () => {
   clearForm();
   showToast("수정을 취소했습니다.");
@@ -544,6 +617,13 @@ elements.fileInput.addEventListener("change", () => {
   elements.fileInput.value = "";
 });
 
-loadWords();
-render();
-registerServiceWorker();
+async function initializeApp() {
+  elements.saveButton.disabled = true;
+  await loadWords();
+  updateDuplicateWarnings();
+  render();
+  registerServiceWorker();
+  elements.saveButton.disabled = false;
+}
+
+initializeApp();
